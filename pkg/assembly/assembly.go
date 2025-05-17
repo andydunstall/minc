@@ -39,7 +39,7 @@ func (n *PseudoOperand) node()        {}
 func (n *PseudoOperand) operandNode() {}
 
 type StackOperand struct {
-	Offset uint32
+	Offset int32
 }
 
 func (n *StackOperand) node()        {}
@@ -154,12 +154,33 @@ type LabelInst struct {
 func (n *LabelInst) node()     {}
 func (n *LabelInst) instNode() {}
 
+type PushInst struct {
+	V Operand
+}
+
+func (n *PushInst) node()     {}
+func (n *PushInst) instNode() {}
+
 type AllocateStackInst struct {
-	N uint32
+	N int32
 }
 
 func (n *AllocateStackInst) node()     {}
 func (n *AllocateStackInst) instNode() {}
+
+type DeallocateStackInst struct {
+	N int32
+}
+
+func (n *DeallocateStackInst) node()     {}
+func (n *DeallocateStackInst) instNode() {}
+
+type CallInst struct {
+	Func string
+}
+
+func (n *CallInst) node()     {}
+func (n *CallInst) instNode() {}
 
 type File struct {
 	Decls []Decl

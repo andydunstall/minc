@@ -35,8 +35,9 @@ type Decl interface {
 }
 
 type FuncDecl struct {
-	Name  string
-	Insts []Inst
+	Name   string
+	Params []string
+	Insts  []Inst
 }
 
 func (n *FuncDecl) node()     {}
@@ -105,6 +106,15 @@ type JumpIfNotZeroInst struct {
 
 func (n *JumpIfNotZeroInst) node()     {}
 func (n *JumpIfNotZeroInst) instNode() {}
+
+type CallInst struct {
+	Name string
+	Args []Value
+	Dest Value
+}
+
+func (n *CallInst) node()     {}
+func (n *CallInst) instNode() {}
 
 type LabelInst struct {
 	Name string

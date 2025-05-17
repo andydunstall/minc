@@ -68,6 +68,12 @@ func emitInst(inst assembly.Inst) string {
 		return "\tcdq\n"
 	case *assembly.AllocateStackInst:
 		return fmt.Sprintf("\tsubq $%d, %%rsp\n", v.N)
+	case *assembly.DeallocateStackInst:
+		return fmt.Sprintf("\taddq $%d, %%rsp\n", v.N)
+	case *assembly.PushInst:
+		return fmt.Sprintf("\tpushq %s\n", emitQuadOperand(v.V))
+	case *assembly.CallInst:
+		return fmt.Sprintf("\tcall %s\n", v.Func)
 	case *assembly.LabelInst:
 		return fmt.Sprintf(".L%s:\n", v.Name)
 	case *assembly.CmpInst:
@@ -114,12 +120,59 @@ func emitOperand(op assembly.Operand) string {
 	case *assembly.RegisterOperand:
 		if v.Reg == "AX" {
 			return "%eax"
+		} else if v.Reg == "CX" {
+			return "%ecx"
+		} else if v.Reg == "DX" {
+			return "%edx"
+		} else if v.Reg == "DI" {
+			return "%edi"
+		} else if v.Reg == "SI" {
+			return "%esi"
+		} else if v.Reg == "R8" {
+			return "%r8d"
+		} else if v.Reg == "R9" {
+			return "%r9d"
 		} else if v.Reg == "R10" {
 			return "%r10d"
 		} else if v.Reg == "R11" {
 			return "%r11d"
+		} else {
+			panic("unsupported register: " + v.Reg)
+		}
+
+	case *assembly.ImmOperand:
+		return "$" + v.V
+	case *assembly.PseudoOperand:
+		// The IR pass should remove all pseudo operands.
+		panic("pseudo operand")
+	case *assembly.StackOperand:
+		return fmt.Sprintf("%d(%%rbp)", v.Offset)
+	default:
+		panic("unsupported operand type")
+	}
+}
+
+func emitQuadOperand(op assembly.Operand) string {
+	switch v := op.(type) {
+	case *assembly.RegisterOperand:
+		if v.Reg == "AX" {
+			return "%rax"
+		} else if v.Reg == "CX" {
+			return "%rcx"
 		} else if v.Reg == "DX" {
-			return "%edx"
+			return "%rdx"
+		} else if v.Reg == "DI" {
+			return "%rdi"
+		} else if v.Reg == "SI" {
+			return "%rsi"
+		} else if v.Reg == "R8" {
+			return "%r8"
+		} else if v.Reg == "R9" {
+			return "%r9"
+		} else if v.Reg == "R10" {
+			return "%r10"
+		} else if v.Reg == "R11" {
+			return "%r11"
 		} else {
 			panic("unsupported register: " + v.Reg)
 		}

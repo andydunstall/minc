@@ -41,7 +41,7 @@ main:
 main:
 	pushq %rbp
 	movq %rsp, %rbp
-	subq $8, %rsp
+	subq $16, %rsp
 	movl $2, -4(%rbp)
 	negl -4(%rbp)
 	movl -4(%rbp), %r10d
@@ -103,7 +103,7 @@ main:
 main:
 	pushq %rbp
 	movq %rsp, %rbp
-	subq $20, %rsp
+	subq $32, %rsp
 	movl $1, -4(%rbp)
 	movl $2, -8(%rbp)
 	movl $3, -12(%rbp)
@@ -167,7 +167,7 @@ main:
 main:
 	pushq %rbp
 	movq %rsp, %rbp
-	subq $20, %rsp
+	subq $32, %rsp
 	movl $1, -4(%rbp)
 .Lcontinue.loop.1:
 	cmpl $5, -4(%rbp)
@@ -201,6 +201,90 @@ main:
 	jmp .Lcontinue.loop.1
 .Lbreak.loop.1:
 	movl -4(%rbp), %eax
+	movq %rbp, %rsp
+	popq %rbp
+	ret
+	.section .note.GNU-stack,"",@progbits
+`,
+		},
+		{
+			Name: "functions",
+			Path: "functions.c",
+			Want: `	.global two
+two:
+	pushq %rbp
+	movq %rsp, %rbp
+	subq $0, %rsp
+	movl $2, %eax
+	movq %rbp, %rsp
+	popq %rbp
+	ret
+	.global addFive
+addFive:
+	pushq %rbp
+	movq %rsp, %rbp
+	subq $16, %rsp
+	movl %edi, -4(%rbp)
+	movl -4(%rbp), %r10d
+	movl %r10d, -8(%rbp)
+	addl $5, -8(%rbp)
+	movl -8(%rbp), %eax
+	movq %rbp, %rsp
+	popq %rbp
+	ret
+	.global addTen
+addTen:
+	pushq %rbp
+	movq %rsp, %rbp
+	subq $16, %rsp
+	movl %edi, -4(%rbp)
+	subq $8, %rsp
+	movl -4(%rbp), %edi
+	call addFive
+	addq $16, %rsp
+	movl %eax, -8(%rbp)
+	subq $8, %rsp
+	movl -8(%rbp), %edi
+	call addFive
+	addq $16, %rsp
+	movl %eax, -12(%rbp)
+	movl -12(%rbp), %eax
+	movq %rbp, %rsp
+	popq %rbp
+	ret
+	.global main
+main:
+	pushq %rbp
+	movq %rsp, %rbp
+	subq $32, %rsp
+	call two
+	addq $0, %rsp
+	movl %eax, -4(%rbp)
+	call two
+	addq $0, %rsp
+	movl %eax, -8(%rbp)
+	movl -8(%rbp), %r10d
+	movl %r10d, -12(%rbp)
+	addl $1, -12(%rbp)
+	subq $8, %rsp
+	movl -12(%rbp), %edi
+	call addTen
+	addq $16, %rsp
+	movl %eax, -16(%rbp)
+	movl -4(%rbp), %r10d
+	movl %r10d, -20(%rbp)
+	movl -16(%rbp), %r10d
+	addl %r10d, -20(%rbp)
+	subq $8, %rsp
+	movl $5, %edi
+	call addTen
+	addq $16, %rsp
+	movl %eax, -24(%rbp)
+	movl -20(%rbp), %r10d
+	movl %r10d, -28(%rbp)
+	movl -24(%rbp), %r10d
+	addl %r10d, -28(%rbp)
+	movl -28(%rbp), %eax
 	movq %rbp, %rsp
 	popq %rbp
 	ret

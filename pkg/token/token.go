@@ -39,10 +39,12 @@ const (
 	RPAREN    // )
 	RBRACE    // }
 	SEMICOLON // ;
+	COMMA     // ,
 	operator_end
 
 	// Keywords
 	keyword_beg
+	FN
 	LET
 
 	RETURN
@@ -91,7 +93,9 @@ var tokens = [...]string{
 	RPAREN:    ")",
 	RBRACE:    "}",
 	SEMICOLON: ";",
+	COMMA:     ",",
 
+	FN:  "fn",
 	LET: "let",
 
 	RETURN: "return",

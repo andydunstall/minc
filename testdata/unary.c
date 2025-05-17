@@ -1,3 +1,3 @@
-int main() {
+fn main() {
 	return ~(-2);
 }

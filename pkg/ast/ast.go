@@ -45,6 +45,14 @@ type AssignExpr struct {
 func (n *AssignExpr) node()     {}
 func (n *AssignExpr) exprNode() {}
 
+type CallExpr struct {
+	Func string
+	Args []Expr
+}
+
+func (n *CallExpr) node()     {}
+func (n *CallExpr) exprNode() {}
+
 type BasicLitExpr struct {
 	Kind  token.Token
 	Value string
@@ -137,7 +145,8 @@ func (n *VarDecl) node()     {}
 func (n *VarDecl) declNode() {}
 
 type FuncType struct {
-	Result string
+	// TODO(andydunstall): No types yet, only identifier names.
+	Params []string
 }
 
 func (n *FuncType) node() {}

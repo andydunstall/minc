@@ -1,4 +1,4 @@
-int main() {
+fn main() {
 	let x = 1;
 	loop (x < 5) {
 		x = x + 1;

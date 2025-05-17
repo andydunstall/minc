@@ -19,7 +19,7 @@ func Validate(root Node, debug bool) (Node, error) {
 }
 
 type validator struct {
-	vars map[string]varEntry
+	identifiers map[string]varEntry
 
 	varCounter int
 	// A loop count of 0 means not in a loop.
@@ -28,7 +28,7 @@ type validator struct {
 
 func newValidator(debug bool) *validator {
 	return &validator{
-		vars:        make(map[string]varEntry),
+		identifiers: make(map[string]varEntry),
 		varCounter:  1,
 		loopCounter: 0,
 	}
@@ -54,7 +54,7 @@ func (v *validator) validate(n Node) (Node, error) {
 func (v *validator) validateExpr(expr Expr) Expr {
 	switch expr := expr.(type) {
 	case *VarExpr:
-		e, ok := v.vars[expr.Name]
+		e, ok := v.identifiers[expr.Name]
 		if !ok {
 			panic("undeclared variable: " + expr.Name)
 		}
@@ -71,6 +71,12 @@ func (v *validator) validateExpr(expr Expr) Expr {
 	case *BinaryExpr:
 		expr.L = v.validateExpr(expr.L)
 		expr.R = v.validateExpr(expr.R)
+	case *CallExpr:
+		var args []Expr
+		for _, arg := range expr.Args {
+			args = append(args, v.validateExpr(arg))
+		}
+		expr.Args = args
 	}
 	return expr
 }
@@ -126,17 +132,17 @@ func (v *validator) validateBlockStmt(block *BlockStmt) *BlockStmt {
 	// reset to the existing scope.
 
 	existingVars := make(map[string]varEntry)
-	for k, e := range v.vars {
+	for k, e := range v.identifiers {
 		existingVars[k] = e
 		e.fromScope = false
-		v.vars[k] = e
+		v.identifiers[k] = e
 	}
 
 	for i, stmt := range block.List {
 		block.List[i] = v.validateStmt(stmt)
 	}
 
-	v.vars = existingVars
+	v.identifiers = existingVars
 
 	return block
 }
@@ -146,28 +152,60 @@ func (v *validator) validateBlockStmt(block *BlockStmt) *BlockStmt {
 func (v *validator) validateDecl(decl Decl) Decl {
 	switch decl := decl.(type) {
 	case *FuncDecl:
-		decl.Body = v.validateBlockStmt(decl.Body)
+		v.validateFuncDecl(decl)
 	case *VarDecl:
 		v.validateVarDecl(decl)
 	}
 	return decl
 }
 
-func (v *validator) validateVarDecl(decl *VarDecl) *VarDecl {
-	e, ok := v.vars[decl.Name]
+func (v *validator) validateFuncDecl(decl *FuncDecl) {
+	// Functions create a new scope (including parameters). Therefore store
+	// the current variables, and create a new scope for the block. After the
+	// block, reset to the existing scope.
+
+	existingVars := make(map[string]varEntry)
+	for k, e := range v.identifiers {
+		existingVars[k] = e
+		e.fromScope = false
+		v.identifiers[k] = e
+	}
+
+	for i, param := range decl.Type.Params {
+		e, ok := v.identifiers[param]
+		if ok && e.fromScope {
+			panic("duplicate declaration: " + param)
+		}
+
+		updatedName := v.nextVar(param)
+
+		v.identifiers[param] = varEntry{
+			name:      updatedName,
+			fromScope: true,
+		}
+
+		decl.Type.Params[i] = updatedName
+	}
+
+	decl.Body = v.validateBlockStmt(decl.Body)
+
+	v.identifiers = existingVars
+}
+
+func (v *validator) validateVarDecl(decl *VarDecl) {
+	e, ok := v.identifiers[decl.Name]
 	if ok && e.fromScope {
 		panic("duplicate declaration: " + decl.Name)
 	}
 
 	updatedName := v.nextVar(decl.Name)
-	v.vars[decl.Name] = varEntry{
+	v.identifiers[decl.Name] = varEntry{
 		name:      updatedName,
 		fromScope: true,
 	}
 
 	decl.Name = updatedName
 	decl.Expr = v.validateExpr(decl.Expr)
-	return decl
 }
 
 func (v *validator) loopLabel() string {

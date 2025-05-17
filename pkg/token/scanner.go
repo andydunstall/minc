@@ -100,6 +100,8 @@ func (s *Scanner) Scan() (tok Token, lit string) {
 			tok = RBRACE
 		case ';':
 			tok = SEMICOLON
+		case ',':
+			tok = COMMA
 		case '~':
 			tok = TILDE
 		case eof:

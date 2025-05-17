@@ -29,7 +29,7 @@ func (f *fixer) fixInsts(insts []Inst) []Inst {
 	var updatedInsts []Inst
 
 	updatedInsts = append(updatedInsts, &AllocateStackInst{
-		N: offset,
+		N: roundUpToNextMultipleOf16(-offset),
 	})
 	for _, inst := range insts {
 		switch v := inst.(type) {
@@ -177,12 +177,12 @@ func (f *fixer) fixInsts(insts []Inst) []Inst {
 	return updatedInsts
 }
 
-func (f *fixer) replacePseudos(insts []Inst) ([]Inst, uint32) {
+func (f *fixer) replacePseudos(insts []Inst) ([]Inst, int32) {
 	// TODO(andydunstall): Add support for AST walking instead of checking
 	// each instruction.
 
-	var lastOffset uint32
-	offsets := make(map[string]uint32)
+	var lastOffset int32
+	offsets := make(map[string]int32)
 
 	replace := func(op Operand) Operand {
 		pseudo, ok := op.(*PseudoOperand)
@@ -195,7 +195,7 @@ func (f *fixer) replacePseudos(insts []Inst) ([]Inst, uint32) {
 				Offset: off,
 			}
 		} else {
-			lastOffset += 4
+			lastOffset -= 4
 			offsets[pseudo.V] = lastOffset
 			return &StackOperand{
 				Offset: lastOffset,
@@ -236,9 +236,21 @@ func (f *fixer) replacePseudos(insts []Inst) ([]Inst, uint32) {
 				C: v.C,
 				V: replace(v.V),
 			}
+		case *PushInst:
+			inst = &PushInst{
+				V: replace(v.V),
+			}
 		}
 		updatedInsts = append(updatedInsts, inst)
 	}
 
 	return updatedInsts, lastOffset
+}
+
+func roundUpToNextMultipleOf16(n int32) int32 {
+	remainder := n % 16
+	if remainder == 0 {
+		return n
+	}
+	return n + (16 - remainder)
 }

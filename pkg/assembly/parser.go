@@ -5,6 +5,8 @@ import (
 	"github.com/andydunstall/minc/pkg/token"
 )
 
+var paramPassingRegs = []string{"DI", "SI", "DX", "CX", "R8", "R9"}
+
 func Parse(root ir.Node, debug bool) (n Node, err error) {
 	p := newParser(debug)
 	n = p.parse(root)
@@ -57,19 +59,49 @@ func (p *parser) parseValue(v ir.Value) Operand {
 // Declarations.
 
 func (p *parser) parseDecl(decl ir.Decl) Decl {
-	switch v := decl.(type) {
+	switch decl := decl.(type) {
 	case *ir.FuncDecl:
-		var insts []Inst
-		for _, inst := range v.Insts {
-			insts = append(insts, p.parseInst(inst)...)
-		}
-
-		return &FuncDecl{
-			Name:  v.Name,
-			Insts: insts,
-		}
+		return p.parseFuncDecl(decl)
 	default:
 		panic("unsupported decl type")
+	}
+}
+
+func (p *parser) parseFuncDecl(decl *ir.FuncDecl) *FuncDecl {
+	var insts []Inst
+
+	for i := 0; i != 6; i++ {
+		if i >= len(decl.Params) {
+			break
+		}
+
+		insts = append(insts, &MovInst{
+			L: &RegisterOperand{
+				Reg: paramPassingRegs[i],
+			},
+			R: &PseudoOperand{
+				V: decl.Params[i],
+			},
+		})
+	}
+	for i := 6; i < len(decl.Params); i++ {
+		insts = append(insts, &MovInst{
+			L: &StackOperand{
+				Offset: int32(16 + 8*(i-6)),
+			},
+			R: &PseudoOperand{
+				V: decl.Params[i],
+			},
+		})
+	}
+
+	for _, inst := range decl.Insts {
+		insts = append(insts, p.parseInst(inst)...)
+	}
+
+	return &FuncDecl{
+		Name:  decl.Name,
+		Insts: insts,
 	}
 }
 
@@ -91,6 +123,8 @@ func (p *parser) parseInst(inst ir.Inst) (insts []Inst) {
 		return p.parseJumpIfZeroInst(v)
 	case *ir.JumpIfNotZeroInst:
 		return p.parseJumpIfNotZeroInst(v)
+	case *ir.CallInst:
+		return p.parseCallInst(v)
 	case *ir.LabelInst:
 		return []Inst{
 			&LabelInst{
@@ -282,4 +316,73 @@ func (p *parser) parseJumpIfNotZeroInst(inst *ir.JumpIfNotZeroInst) []Inst {
 			Label: inst.Label,
 		},
 	}
+}
+
+func (p *parser) parseCallInst(inst *ir.CallInst) []Inst {
+	var insts []Inst
+
+	var padding int32
+	if len(inst.Args)%2 != 0 {
+		padding = 8
+		// Padding.
+		insts = append(insts, &AllocateStackInst{
+			N: padding,
+		})
+	}
+
+	// Push args to registers.
+	n := len(inst.Args)
+	if n > 6 {
+		n = 6
+	}
+	for i := 0; i < n; i++ {
+		insts = append(insts, &MovInst{
+			L: p.parseValue(inst.Args[i]),
+			R: &RegisterOperand{
+				Reg: paramPassingRegs[i],
+			},
+		})
+	}
+
+	// Push args to stack.
+	for i := 6; i < len(inst.Args); i++ {
+		v := p.parseValue(inst.Args[i])
+		switch v := v.(type) {
+		case *ImmOperand, *RegisterOperand:
+			insts = append(insts, &PushInst{
+				V: v,
+			})
+		default:
+			insts = append(insts, &MovInst{
+				L: v,
+				R: &RegisterOperand{
+					Reg: "AX",
+				},
+			})
+			insts = append(insts, &PushInst{
+				V: &RegisterOperand{
+					Reg: "AX",
+				},
+			})
+
+		}
+	}
+
+	insts = append(insts, &CallInst{
+		inst.Name,
+	})
+
+	insts = append(insts, &DeallocateStackInst{
+		N: int32(len(inst.Args)*8) + padding,
+	})
+
+	dest := p.parseValue(inst.Dest)
+	insts = append(insts, &MovInst{
+		L: &RegisterOperand{
+			Reg: "AX",
+		},
+		R: dest,
+	})
+
+	return insts
 }

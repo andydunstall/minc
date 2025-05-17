@@ -99,6 +99,29 @@ func (p *parser) parseBinaryExpr(l Expr, prec int) *BinaryExpr {
 	}
 }
 
+func (p *parser) parseCallExpr(name string) *CallExpr {
+	if p.debug {
+		defer un(trace(p, "CallExpr"))
+	}
+
+	var args []Expr
+
+	p.expect(token.LPAREN)
+	for p.tok != token.RPAREN {
+		args = append(args, p.parseExpr(0))
+
+		if p.tok != token.RPAREN {
+			p.expect(token.COMMA)
+		}
+	}
+	p.expect(token.RPAREN)
+
+	return &CallExpr{
+		Func: name,
+		Args: args,
+	}
+}
+
 func (p *parser) parseFactor() Expr {
 	if p.debug {
 		defer un(trace(p, "Factor"))
@@ -128,8 +151,13 @@ func (p *parser) parseFactor() Expr {
 	case token.IDENT:
 		name := p.lit
 		p.next()
-		return &VarExpr{
-			Name: name,
+
+		if p.tok == token.LPAREN {
+			return p.parseCallExpr(name)
+		} else {
+			return &VarExpr{
+				Name: name,
+			}
 		}
 	default:
 		panic("unknown: " + p.tok.String())
@@ -211,19 +239,8 @@ func (p *parser) parseDeclStmt() *DeclStmt {
 		defer un(trace(p, "DeclStmt"))
 	}
 
-	p.expect(token.LET)
-	name := p.lit
-	p.expect(token.IDENT)
-	p.expect(token.ASSIGN)
-
-	expr := p.parseExpr(0)
-	p.expect(token.SEMICOLON)
-
 	return &DeclStmt{
-		Decl: &VarDecl{
-			Name: name,
-			Expr: expr,
-		},
+		Decl: p.parseDecl(),
 	}
 }
 
@@ -296,8 +313,14 @@ func (p *parser) parseDecl() Decl {
 		defer un(trace(p, "Decl"))
 	}
 
-	// Only support function top-level declarations.
-	return p.parseFuncDecl()
+	switch p.tok {
+	case token.FN:
+		return p.parseFuncDecl()
+	case token.LET:
+		return p.parseVarDecl()
+	default:
+		panic("unsupported decl")
+	}
 }
 
 func (p *parser) parseFuncDecl() *FuncDecl {
@@ -305,20 +328,54 @@ func (p *parser) parseFuncDecl() *FuncDecl {
 		defer un(trace(p, "FuncDecl"))
 	}
 
-	resultType := p.parseIdent()
+	p.expect(token.FN)
 	funcName := p.parseIdent()
 
+	var funcType FuncType
+
 	p.expect(token.LPAREN)
-	// TODO(andydunstall): Handle parameters.
+	for p.tok != token.RPAREN {
+		paramType := p.lit
+		p.expect(token.IDENT)
+		if paramType != "int" {
+			panic("unsupported type: " + paramType)
+		}
+
+		name := p.lit
+		p.expect(token.IDENT)
+
+		funcType.Params = append(funcType.Params, name)
+
+		if p.tok != token.RPAREN {
+			p.expect(token.COMMA)
+		}
+	}
 	p.expect(token.RPAREN)
 
 	body := p.parseBlockStmt()
 	return &FuncDecl{
 		Name: funcName,
-		Type: &FuncType{
-			Result: resultType,
-		},
+		Type: &funcType,
 		Body: body,
+	}
+}
+
+func (p *parser) parseVarDecl() *VarDecl {
+	if p.debug {
+		defer un(trace(p, "VarDecl"))
+	}
+
+	p.expect(token.LET)
+	name := p.lit
+	p.expect(token.IDENT)
+	p.expect(token.ASSIGN)
+
+	expr := p.parseExpr(0)
+	p.expect(token.SEMICOLON)
+
+	return &VarDecl{
+		Name: name,
+		Expr: expr,
 	}
 }
 

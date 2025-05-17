@@ -48,6 +48,8 @@ func (p *parser) parseExpr(expr ast.Expr) (Value, []Inst) {
 		return p.parseVarExpr(expr)
 	case *ast.AssignExpr:
 		return p.parseAssignExpr(expr)
+	case *ast.CallExpr:
+		return p.parseCallExpr(expr)
 	case *ast.BasicLitExpr:
 		return p.parseBasicLitExpr(expr)
 	default:
@@ -208,6 +210,28 @@ func (p *parser) parseAssignExpr(e *ast.AssignExpr) (Value, []Inst) {
 	return v, insts
 }
 
+func (p *parser) parseCallExpr(e *ast.CallExpr) (Value, []Inst) {
+	dest := &VarValue{
+		V: p.nextVar(),
+	}
+
+	var argInsts []Inst
+	var argVals []Value
+
+	for _, val := range e.Args {
+		val, insts := p.parseExpr(val)
+		argInsts = append(argInsts, insts...)
+		argVals = append(argVals, val)
+	}
+
+	insts := append(argInsts, &CallInst{
+		Name: e.Func,
+		Args: argVals,
+		Dest: dest,
+	})
+	return dest, insts
+}
+
 func (p *parser) parseBasicLitExpr(e *ast.BasicLitExpr) (Value, []Inst) {
 	return &ConstValue{
 		V: e.Value,
@@ -337,8 +361,9 @@ func (p *parser) parseDecl(decl ast.Decl) []Inst {
 
 func (p *parser) parseFuncDecl(decl *ast.FuncDecl) Decl {
 	return &FuncDecl{
-		Name:  decl.Name,
-		Insts: p.parseBlockStmt(decl.Body),
+		Name:   decl.Name,
+		Params: decl.Type.Params,
+		Insts:  p.parseBlockStmt(decl.Body),
 	}
 }
 
